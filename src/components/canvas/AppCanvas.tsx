@@ -15,9 +15,11 @@ import '@xyflow/react/dist/style.css';
 import { useUIStore } from '@/store/useUIStore';
 import { useAppGraph } from '@/hooks/useAppGraph';
 import { ServiceNode } from './ServiceNode';
+import { DatabaseNode } from './DatabaseNode';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
 import type { ServiceNodeData } from '@/types';
+import { addGraphNode, addGraphEdge, removeGraphNode } from '@/api/graph';
 
 export const AppCanvas: React.FC = () => {
   const selectedAppId = useUIStore((state) => state.selectedAppId);
@@ -33,7 +35,7 @@ export const AppCanvas: React.FC = () => {
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
 
   // Node types registration
-  const nodeTypes = useMemo(() => ({ service: ServiceNode }), []);
+  const nodeTypes = useMemo(() => ({ service: ServiceNode, db: DatabaseNode }), []);
 
   // Update canvas nodes/edges when graph data loads/changes
   useEffect(() => {
@@ -57,39 +59,79 @@ export const AppCanvas: React.FC = () => {
 
   // Sync addNode action from TopBar
   useEffect(() => {
-    if (addNodeTrigger > 0) {
+    if (addNodeTrigger > 0 && selectedAppId) {
       const newNodeId = `node-${Date.now()}`;
+      let nodeLength = 0;
+
       setNodes((nds) => {
+        nodeLength = nds.length;
         const newNode: Node<ServiceNodeData> = {
           id: newNodeId,
           type: 'service',
           position: { x: Math.random() * 150 + 200, y: Math.random() * 150 + 150 },
           data: {
-            label: `New Service ${nds.length + 1}`,
+            label: `New Service ${nodeLength + 1}`,
             description: 'A dynamically created microservice.',
             replicas: 1,
             status: 'Healthy',
           },
         };
+        // Persist to mock database
+        addGraphNode(selectedAppId, newNode);
         return [...nds, newNode];
       });
 
       if (selectedNodeId) {
-        setEdges((eds) => [
-          ...eds,
-          {
-            id: `edge-${selectedNodeId}-${newNodeId}`,
-            source: selectedNodeId,
-            target: newNodeId,
-            animated: true,
-            style: { stroke: 'var(--primary)', strokeWidth: 1.5 },
-          },
-        ]);
+        const newEdge = {
+          id: `edge-${selectedNodeId}-${newNodeId}`,
+          source: selectedNodeId,
+          target: newNodeId,
+          animated: true,
+          style: { stroke: 'var(--primary)', strokeWidth: 1.5 },
+        };
+        // Persist edge to mock database
+        addGraphEdge(selectedAppId, newEdge);
+        setEdges((eds) => [...eds, newEdge]);
       }
 
       setSelectedNode(newNodeId);
     }
-  }, [addNodeTrigger, selectedNodeId, setNodes, setEdges, setSelectedNode]);
+  }, [addNodeTrigger, selectedAppId, selectedNodeId, setNodes, setEdges, setSelectedNode]);
+
+  // Keyboard shortcuts (Fit view: F, Toggle panel: I)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is editing text in an input or textarea
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      if (e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        fitView({ duration: 300 });
+      }
+
+      if (e.key.toLowerCase() === 'i') {
+        e.preventDefault();
+        if (selectedNodeId) {
+          setSelectedNode(null);
+        } else if (nodes.length > 0) {
+          const firstNode = nodes[0];
+          if (firstNode) {
+            setSelectedNode(firstNode.id);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [fitView, selectedNodeId, setSelectedNode, nodes]);
 
   // Node Click handler
   const handleNodeClick = (_event: React.MouseEvent, node: Node) => {
@@ -103,6 +145,11 @@ export const AppCanvas: React.FC = () => {
 
   // Node delete handler (clears selection if deleted)
   const handleNodesDelete = (deletedNodes: Node[]) => {
+    if (selectedAppId) {
+      deletedNodes.forEach((node) => {
+        removeGraphNode(selectedAppId, node.id);
+      });
+    }
     if (deletedNodes.some((node) => node.id === selectedNodeId)) {
       setSelectedNode(null);
     }

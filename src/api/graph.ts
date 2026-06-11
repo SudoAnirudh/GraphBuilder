@@ -1,4 +1,4 @@
-import type { GraphResponse } from '../types';
+import type { GraphResponse, ServiceNodeData } from '../types';
 
 const GRAPHS: Record<string, GraphResponse> = {
   'app-1': {
@@ -16,7 +16,7 @@ const GRAPHS: Record<string, GraphResponse> = {
       },
       {
         id: 'p-2',
-        type: 'service',
+        type: 'db',
         position: { x: 50, y: 200 },
         data: {
           label: 'Payments PostgreSQL Database',
@@ -57,7 +57,7 @@ const GRAPHS: Record<string, GraphResponse> = {
       },
       {
         id: 'a-2',
-        type: 'service',
+        type: 'db',
         position: { x: 50, y: 200 },
         data: {
           label: 'Users MySQL Cluster',
@@ -68,7 +68,7 @@ const GRAPHS: Record<string, GraphResponse> = {
       },
       {
         id: 'a-3',
-        type: 'service',
+        type: 'db',
         position: { x: 450, y: 200 },
         data: {
           label: 'Redis Cache Service',
@@ -140,3 +140,48 @@ export const fetchGraph = (appId: string): Promise<GraphResponse> =>
       res(JSON.parse(JSON.stringify(baseGraph)) as GraphResponse);
     }, 800);
   });
+
+// Persist node updates in memory
+export const updateGraphNode = (appId: string, nodeId: string, updates: Partial<ServiceNodeData>) => {
+  const graph = GRAPHS[appId];
+  if (graph) {
+    graph.nodes = graph.nodes.map((n) => {
+      if (n.id === nodeId) {
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            ...updates,
+          },
+        };
+      }
+      return n;
+    });
+  }
+};
+
+// Persist dynamic node additions
+export const addGraphNode = (appId: string, node: any) => {
+  const graph = GRAPHS[appId];
+  if (graph) {
+    graph.nodes.push(node);
+  }
+};
+
+// Persist node deletions
+export const removeGraphNode = (appId: string, nodeId: string) => {
+  const graph = GRAPHS[appId];
+  if (graph) {
+    graph.nodes = graph.nodes.filter((n) => n.id !== nodeId);
+    graph.edges = graph.edges.filter((e) => e.source !== nodeId && e.target !== nodeId);
+  }
+};
+
+// Persist edge additions
+export const addGraphEdge = (appId: string, edge: any) => {
+  const graph = GRAPHS[appId];
+  if (graph) {
+    graph.edges.push(edge);
+  }
+};
+

@@ -6,9 +6,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { useUIStore } from '@/store/useUIStore';
 import type { ServiceNodeData } from '@/types';
+import { updateGraphNode } from '@/api/graph';
 
 export const ConfigTab: React.FC = () => {
   const selectedNodeId = useUIStore((state) => state.selectedNodeId);
+  const selectedAppId = useUIStore((state) => state.selectedAppId);
   const nodes = useNodes();
   const { setNodes } = useReactFlow();
 
@@ -25,12 +27,18 @@ export const ConfigTab: React.FC = () => {
   const { label, description, replicas } = node.data;
 
   const handleLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (selectedAppId && selectedNodeId) {
+      updateGraphNode(selectedAppId, selectedNodeId, { label: e.target.value });
+    }
     setNodes((prev) =>
       prev.map((n) => (n.id === selectedNodeId ? { ...n, data: { ...n.data, label: e.target.value } } : n))
     );
   };
 
   const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (selectedAppId && selectedNodeId) {
+      updateGraphNode(selectedAppId, selectedNodeId, { description: e.target.value });
+    }
     setNodes((prev) =>
       prev.map((n) => (n.id === selectedNodeId ? { ...n, data: { ...n.data, description: e.target.value } } : n))
     );
@@ -38,6 +46,9 @@ export const ConfigTab: React.FC = () => {
 
   const handleReplicasChange = (val: number) => {
     const clamped = Math.min(100, Math.max(0, val));
+    if (selectedAppId && selectedNodeId) {
+      updateGraphNode(selectedAppId, selectedNodeId, { replicas: clamped });
+    }
     setNodes((prev) =>
       prev.map((n) => (n.id === selectedNodeId ? { ...n, data: { ...n.data, replicas: clamped } } : n))
     );
